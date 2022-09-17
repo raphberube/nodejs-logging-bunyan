@@ -21,6 +21,7 @@ import * as proxyquire from 'proxyquire';
 
 // types-only import. Actual require is done through proxyquire below.
 import {MiddlewareOptions} from '../../src/middleware/express';
+import * as types from '../../src/types/core';
 
 const FAKE_PROJECT_ID = 'project-🦄';
 const FAKE_GENERATED_MIDDLEWARE = () => {};
@@ -134,5 +135,49 @@ describe('middleware/express', () => {
       // emitRequestLog parameter to makeChildLogger should be undefined.
       assert.strictEqual(passedEmitRequestLog, undefined);
     });
+  });
+
+  it('should set redirectToStdOut at false by default', async () => {
+    await middleware();
+    assert.ok(
+      passedOptions.some(
+        option => typeof option!.redirectToStdout !== 'boolean'
+      )
+    );
+    assert.ok(
+      passedOptions.some(option => {
+        const redirectOpt = option!
+          .redirectToStdout as types.RedirectToStdoutOptions;
+        return (
+          redirectOpt.appLogger === false && redirectOpt.requestLogger === false
+        );
+      })
+    );
+  });
+
+  it('should should prefer user-provided redirectToStdOut and apply it to both app and request logger', async () => {
+    const OPTIONS = {redirectToStdout: true};
+    await middleware(OPTIONS);
+    assert.ok(
+      passedOptions.some(option => {
+        const redirectOpt = option!
+          .redirectToStdout as types.RedirectToStdoutOptions;
+        return redirectOpt.appLogger === true && redirectOpt.appLogger === true;
+      })
+    );
+  });
+
+  it('should should prefer user-provided values for redirectToStdOut', async () => {
+    const OPTIONS = {redirectToStdout: {appLogger: true, requestLogger: false}};
+    await middleware(OPTIONS);
+    assert.ok(
+      passedOptions.some(option => {
+        const redirectOpt = option!
+          .redirectToStdout as types.RedirectToStdoutOptions;
+        return (
+          redirectOpt.appLogger === true && redirectOpt.requestLogger === false
+        );
+      })
+    );
   });
 });

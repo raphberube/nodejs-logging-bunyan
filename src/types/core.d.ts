@@ -314,3 +314,8 @@ export interface StreamResponse {
   type: string;
   stream: NodeJS.WritableStream;
 }
+
+export interface RedirectToStdoutOptions {
+  appLogger: boolean;
+  requestLogger: boolean;
+}

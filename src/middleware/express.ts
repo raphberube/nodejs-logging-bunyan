@@ -34,8 +34,10 @@ export const APP_LOG_SUFFIX = 'applog';
 // createLogger.
 export type Logger = ReturnType<typeof bunyan.createLogger>;
 
-export interface MiddlewareOptions extends types.Options {
+export interface MiddlewareOptions
+  extends Omit<types.Options, 'redirectToStdout'> {
   level?: types.LogLevel;
+  redirectToStdout?: boolean | types.RedirectToStdoutOptions;
 }
 
 export interface MiddlewareReturnType {
@@ -52,13 +54,26 @@ export async function middleware(
   const defaultOptions = {logName: 'bunyan_log', level: 'info'};
   options = Object.assign({}, defaultOptions, options);
 
+  options.redirectToStdout = options.redirectToStdout ?? false;
+  if (typeof options.redirectToStdout === 'boolean') {
+    options.redirectToStdout = {
+      appLogger: options.redirectToStdout,
+      requestLogger: options.redirectToStdout,
+    };
+  }
+
   const loggingBunyanApp = new LoggingBunyan(
-    Object.assign({}, options, {
-      // For request bundling to work, the parent (request) and child (app) logs
-      // need to have distinct names. For exact requirements see:
-      // https://cloud.google.com/appengine/articles/logging#linking_app_logs_and_requests
-      logName: `${options.logName}_${APP_LOG_SUFFIX}`,
-    })
+    Object.assign(
+      {},
+      options,
+      {
+        // For request bundling to work, the parent (request) and child (app) logs
+        // need to have distinct names. For exact requirements see:
+        // https://cloud.google.com/appengine/articles/logging#linking_app_logs_and_requests
+        logName: `${options.logName}_${APP_LOG_SUFFIX}`,
+      },
+      {requestLogger: options.redirectToStdout.appLogger}
+    ) as types.Options
   );
   const logger = bunyan.createLogger({
     name: `${options.logName}_${APP_LOG_SUFFIX}`,
@@ -77,7 +92,11 @@ export async function middleware(
   // automatically.
   let emitRequestLog;
   if (env !== GCPEnv.APP_ENGINE && env !== GCPEnv.CLOUD_FUNCTIONS) {
-    const loggingBunyanReq = new LoggingBunyan(options);
+    const loggingBunyanReq = new LoggingBunyan(
+      Object.assign({}, options, {
+        requestLogger: options.redirectToStdout.requestLogger,
+      }) as types.Options
+    );
     const requestLogger = bunyan.createLogger({
       name: options.logName!,
       streams: [loggingBunyanReq.stream(options.level as types.LogLevel)],
